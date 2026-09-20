@@ -68,13 +68,14 @@ jobs:
             set -e
             APP_PATH="${{ secrets.VPS_APP_PATH }}"
 
-            # Clone repo if not exists
-            if [ ! -d "$APP_PATH/.git" ]; then
-              mkdir -p "$APP_PATH"
-              cd "$APP_PATH"
+            # Setup repo
+            mkdir -p "$APP_PATH"
+            cd "$APP_PATH"
+
+            if [ ! -d ".git" ]; then
               git clone --branch main https://github.com/${{ github.repository }}.git .
             else
-              cd "$APP_PATH"
+              git remote set-url origin https://github.com/${{ github.repository }}.git || git remote add origin https://github.com/${{ github.repository }}.git
               git fetch origin main
               git reset --hard origin/main
             fi

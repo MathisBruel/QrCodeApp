@@ -72,12 +72,11 @@ jobs:
             if [ ! -d "$APP_PATH/.git" ]; then
               mkdir -p "$APP_PATH"
               cd "$APP_PATH"
-              git clone https://github.com/${{ github.repository }}.git .
-              git checkout main
+              git clone --branch main https://github.com/${{ github.repository }}.git .
             else
               cd "$APP_PATH"
               git fetch origin main
-              git checkout origin/main
+              git reset --hard origin/main
             fi
 
             # Update .env with secrets

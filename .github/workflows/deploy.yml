@@ -98,8 +98,11 @@ jobs:
             # Login to registry
             echo ${{ secrets.GITHUB_TOKEN }} | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
 
+            # Export env vars for docker compose
+            export $(cat .env.production | xargs)
+
             # Restart services with new image
-            docker compose -f docker-compose.prod.yml up -d --pull always
+            docker compose -f docker-compose.prod.yml --env-file .env.production up -d --pull always
 
             # Cleanup
             docker system prune -f

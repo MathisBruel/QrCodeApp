@@ -22,7 +22,7 @@ services:
     image: ghcr.io/mathisbruel/qrcodeapp:main-${COMMIT_SHA}
     restart: always
     ports:
-      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:${APP_PORT:-3002}:3000"
     environment:
       DATABASE_URL: ${DATABASE_URL}
       JWT_SECRET: ${JWT_SECRET}

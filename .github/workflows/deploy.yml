@@ -91,6 +91,7 @@ jobs:
             SMTP_PASS=${{ secrets.SMTP_PASS }}
             SMTP_FROM=${{ secrets.SMTP_FROM }}
             APP_URL=${{ secrets.APP_URL }}
+            APP_PORT=${{ secrets.APP_PORT }}
             NODE_ENV=production
             COMMIT_SHA=${{ github.sha }}
             ENVEOF

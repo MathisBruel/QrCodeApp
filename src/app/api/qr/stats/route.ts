@@ -3,7 +3,15 @@ import { prisma } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
 import { generateQRCodeDataURL } from '@/lib/qr';
 
-function buildDailyClicks(clicks: { timestamp: Date }[], days: number) {
+const MAX_RANGE_DAYS = 1827; // 5 years, safety cap on payload size
+
+function parseDateOnly(value: string | null): Date | null {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const d = new Date(value + 'T00:00:00Z');
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function buildDailyClicks(clicks: { timestamp: Date }[], from: Date, to: Date) {
   const counts = new Map<string, number>();
   for (const click of clicks) {
     const day = click.timestamp.toISOString().split('T')[0];
@@ -11,12 +19,13 @@ function buildDailyClicks(clicks: { timestamp: Date }[], days: number) {
   }
 
   const result: { date: string; count: number }[] = [];
-  const today = new Date();
-  today.setUTCHours(0, 0, 0, 0);
+  const totalDays = Math.round((to.getTime() - from.getTime()) / 86400000) + 1;
+  const cappedFrom =
+    totalDays > MAX_RANGE_DAYS
+      ? new Date(to.getTime() - (MAX_RANGE_DAYS - 1) * 86400000)
+      : from;
 
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(today);
-    d.setUTCDate(d.getUTCDate() - i);
+  for (let d = new Date(cappedFrom); d <= to; d.setUTCDate(d.getUTCDate() + 1)) {
     const key = d.toISOString().split('T')[0];
     result.push({ date: key, count: counts.get(key) || 0 });
   }
@@ -40,7 +49,21 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const qrCodeId = searchParams.get('qrCodeId');
-    const days = Math.min(365, Math.max(1, parseInt(searchParams.get('days') || '30', 10) || 30));
+
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+
+    let rangeTo = parseDateOnly(searchParams.get('to')) || today;
+    let rangeFrom = parseDateOnly(searchParams.get('from'));
+
+    if (!rangeFrom) {
+      const days = Math.max(1, parseInt(searchParams.get('days') || '30', 10) || 30);
+      rangeFrom = new Date(rangeTo.getTime() - (days - 1) * 86400000);
+    }
+
+    if (rangeFrom > rangeTo) {
+      [rangeFrom, rangeTo] = [rangeTo, rangeFrom];
+    }
 
     if (qrCodeId) {
       const qrCode = await prisma.qRCode.findUnique({
@@ -76,7 +99,7 @@ export async function GET(req: NextRequest) {
         )
           .sort(([, a], [, b]) => b - a)
           .slice(0, 5),
-        dailyClicks: buildDailyClicks(clicks, days),
+        dailyClicks: buildDailyClicks(clicks, rangeFrom, rangeTo),
       };
 
       return NextResponse.json({ success: true, stats });

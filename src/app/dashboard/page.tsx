@@ -53,7 +53,9 @@ export default function DashboardPage() {
   const [statsQr, setStatsQr] = useState<QRCode | null>(null);
   const [dailyClicks, setDailyClicks] = useState<{ date: string; count: number }[]>([]);
   const [statsLoading, setStatsLoading] = useState(false);
-  const [statsDays, setStatsDays] = useState(30);
+  const [statsDays, setStatsDays] = useState<number | null>(30);
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
 
   useEffect(() => {
     const token = localStorage.getItem('auth_token');
@@ -200,7 +202,7 @@ export default function DashboardPage() {
     }
   };
 
-  const fetchStats = async (qrId: string, days: number) => {
+  const fetchStats = async (qrId: string, params: { days?: number; from?: string; to?: string }) => {
     setStatsLoading(true);
 
     try {
@@ -210,7 +212,15 @@ export default function DashboardPage() {
         return;
       }
 
-      const res = await fetch(`/api/qr/stats?qrCodeId=${qrId}&days=${days}`, {
+      const query = new URLSearchParams({ qrCodeId: qrId });
+      if (params.from && params.to) {
+        query.set('from', params.from);
+        query.set('to', params.to);
+      } else {
+        query.set('days', String(params.days || 30));
+      }
+
+      const res = await fetch(`/api/qr/stats?${query.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -230,13 +240,23 @@ export default function DashboardPage() {
     setEditingQr(null);
     setStatsQr(qr);
     setStatsDays(30);
-    fetchStats(qr.id, 30);
+    setCustomFrom('');
+    setCustomTo('');
+    fetchStats(qr.id, { days: 30 });
   };
 
   const changeStatsRange = (days: number) => {
     if (!statsQr) return;
     setStatsDays(days);
-    fetchStats(statsQr.id, days);
+    setCustomFrom('');
+    setCustomTo('');
+    fetchStats(statsQr.id, { days });
+  };
+
+  const applyCustomRange = () => {
+    if (!statsQr || !customFrom || !customTo) return;
+    setStatsDays(null);
+    fetchStats(statsQr.id, { from: customFrom, to: customTo });
   };
 
   const copyToClipboard = (text: string) => {
@@ -391,7 +411,7 @@ export default function DashboardPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="flex gap-1 mb-4">
+              <div className="flex gap-1 mb-3">
                 {[7, 30, 90].map((days) => (
                   <button
                     key={days}
@@ -405,6 +425,37 @@ export default function DashboardPage() {
                     {days}d
                   </button>
                 ))}
+              </div>
+              <div className="flex items-end gap-2 pt-3 mb-4 border-t border-neutral-200">
+                <div className="flex flex-col">
+                  <label className="text-xs text-neutral-500 mb-1">From</label>
+                  <input
+                    type="date"
+                    value={customFrom}
+                    max={customTo || undefined}
+                    onChange={(e) => setCustomFrom(e.target.value)}
+                    className="border border-neutral-300 rounded-sm px-2 py-1 text-sm"
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <label className="text-xs text-neutral-500 mb-1">To</label>
+                  <input
+                    type="date"
+                    value={customTo}
+                    min={customFrom || undefined}
+                    max={new Date().toISOString().split('T')[0]}
+                    onChange={(e) => setCustomTo(e.target.value)}
+                    className="border border-neutral-300 rounded-sm px-2 py-1 text-sm"
+                  />
+                </div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={applyCustomRange}
+                  disabled={!customFrom || !customTo}
+                >
+                  Apply
+                </Button>
               </div>
               {statsLoading ? (
                 <p className="text-sm text-neutral-500">Loading...</p>

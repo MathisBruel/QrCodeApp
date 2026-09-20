@@ -94,6 +94,7 @@ jobs:
             NODE_ENV=production
             COMMIT_SHA=${{ github.sha }}
             ENVEOF
+            sed -i "s/^COMMIT_SHA=\(.\{7\}\).*/COMMIT_SHA=\1/" .env.production
 
             # Login to registry
             echo ${{ secrets.GITHUB_TOKEN }} | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin

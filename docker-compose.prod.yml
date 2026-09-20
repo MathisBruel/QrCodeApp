@@ -19,7 +19,7 @@ services:
       retries: 5
 
   app:
-    image: ghcr.io/mathisbruel/qrcodeapp:main-${COMMIT_SHA:0:7}
+    image: ghcr.io/mathisbruel/qrcodeapp:main-${COMMIT_SHA}
     restart: always
     ports:
       - "127.0.0.1:3000:3000"

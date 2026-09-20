@@ -66,11 +66,19 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             set -e
-            cd ${{ secrets.VPS_APP_PATH }}
+            APP_PATH="${{ secrets.VPS_APP_PATH }}"
 
-            # Pull latest code
-            git fetch origin main
-            git checkout origin/main
+            # Clone repo if not exists
+            if [ ! -d "$APP_PATH/.git" ]; then
+              mkdir -p "$APP_PATH"
+              cd "$APP_PATH"
+              git clone https://github.com/${{ github.repository }}.git .
+              git checkout main
+            else
+              cd "$APP_PATH"
+              git fetch origin main
+              git checkout origin/main
+            fi
 
             # Update .env with secrets
             cat > .env.production << 'ENVEOF'

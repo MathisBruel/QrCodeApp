@@ -3,6 +3,8 @@ import { prisma } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
 import { generateQRCodeDataURL } from '@/lib/qr';
 
+export const dynamic = 'force-dynamic';
+
 const MAX_RANGE_DAYS = 1827; // 5 years, safety cap on payload size
 
 function parseDateOnly(value: string | null): Date | null {

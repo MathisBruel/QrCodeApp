@@ -1,0 +1,89 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  USER
+}
+
+model User {
+  id                    String      @id @default(cuid())
+  email                 String      @unique
+  passwordHash          String
+  firstName             String
+  lastName              String
+  role                  UserRole    @default(USER)
+  isActive              Boolean     @default(true)
+  passwordResetToken    String?     @unique
+  passwordResetExpires  DateTime?
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  qrCodes               QRCode[]
+  auditLogs             AuditLog[]
+
+  @@index([email])
+  @@index([isActive])
+}
+
+model QRCode {
+  id                    String      @id @default(cuid())
+  shortCode             String      @unique @db.VarChar(50)
+  targetUrl             String
+  title                 String
+  description           String?
+  createdBy             String
+  user                  User        @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  isActive              Boolean     @default(true)
+  expiresAt             DateTime?
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  clicks                Click[]
+
+  @@index([createdBy])
+  @@index([shortCode])
+  @@index([isActive])
+}
+
+model Click {
+  id                    String      @id @default(cuid())
+  qrCodeId              String
+  qrCode                QRCode      @relation(fields: [qrCodeId], references: [id], onDelete: Cascade)
+  userAgent             String?
+  ipAddress             String?
+  deviceType            String?
+  osName                String?
+  osVersion            String?
+  browserName           String?
+  browserVersion        String?
+  country               String?
+  city                  String?
+  timestamp             DateTime    @default(now())
+
+  @@index([qrCodeId])
+  @@index([timestamp])
+}
+
+model AuditLog {
+  id                    String      @id @default(cuid())
+  userId                String
+  user                  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action                String
+  resourceType          String
+  resourceId            String?
+  changes               String?
+  ipAddress             String?
+  timestamp             DateTime    @default(now())
+
+  @@index([userId])
+  @@index([timestamp])
+  @@index([action])
+}

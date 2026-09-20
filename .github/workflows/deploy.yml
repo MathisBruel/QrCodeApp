@@ -1,0 +1,97 @@
+name: Build & Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix={{branch}}-
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.prod
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+            cd ${{ secrets.VPS_APP_PATH }}
+
+            # Pull latest code
+            git fetch origin main
+            git checkout origin/main
+
+            # Update .env with secrets
+            cat > .env.production << 'ENVEOF'
+            DATABASE_URL=${{ secrets.DATABASE_URL }}
+            DATABASE_PASSWORD=${{ secrets.DATABASE_PASSWORD }}
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            SMTP_HOST=${{ secrets.SMTP_HOST }}
+            SMTP_PORT=${{ secrets.SMTP_PORT }}
+            SMTP_USER=${{ secrets.SMTP_USER }}
+            SMTP_PASS=${{ secrets.SMTP_PASS }}
+            SMTP_FROM=${{ secrets.SMTP_FROM }}
+            APP_URL=${{ secrets.APP_URL }}
+            NODE_ENV=production
+            COMMIT_SHA=${{ github.sha }}
+            ENVEOF
+
+            # Login to registry
+            echo ${{ secrets.GITHUB_TOKEN }} | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+
+            # Restart services with new image
+            docker compose -f docker-compose.prod.yml up -d --pull always
+
+            # Cleanup
+            docker system prune -f

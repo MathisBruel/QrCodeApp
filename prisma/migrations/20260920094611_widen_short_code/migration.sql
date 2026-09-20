@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "QRCode" ALTER COLUMN "shortCode" SET DATA TYPE VARCHAR(50);

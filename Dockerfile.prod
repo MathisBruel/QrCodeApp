@@ -11,7 +11,7 @@ RUN rm -rf node_modules/.prisma/client && npx prisma generate
 RUN npm run build
 
 # Runtime stage
-FROM node:20-alpine
+FROM node:20-slim
 
 WORKDIR /app
 
@@ -19,7 +19,7 @@ ENV NODE_ENV=production
 
 # Install production dependencies only
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci --omit=dev
 
 # Copy built app from builder
 COPY --from=builder /app/.next ./.next

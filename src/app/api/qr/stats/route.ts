@@ -3,6 +3,27 @@ import { prisma } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
 import { generateQRCodeDataURL } from '@/lib/qr';
 
+function buildDailyClicks(clicks: { timestamp: Date }[], days: number) {
+  const counts = new Map<string, number>();
+  for (const click of clicks) {
+    const day = click.timestamp.toISOString().split('T')[0];
+    counts.set(day, (counts.get(day) || 0) + 1);
+  }
+
+  const result: { date: string; count: number }[] = [];
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setUTCDate(d.getUTCDate() - i);
+    const key = d.toISOString().split('T')[0];
+    result.push({ date: key, count: counts.get(key) || 0 });
+  }
+
+  return result;
+}
+
 export async function GET(req: NextRequest) {
   try {
     const authHeader = req.headers.get('authorization');
@@ -19,6 +40,7 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const qrCodeId = searchParams.get('qrCodeId');
+    const days = Math.min(365, Math.max(1, parseInt(searchParams.get('days') || '30', 10) || 30));
 
     if (qrCodeId) {
       const qrCode = await prisma.qRCode.findUnique({
@@ -54,11 +76,7 @@ export async function GET(req: NextRequest) {
         )
           .sort(([, a], [, b]) => b - a)
           .slice(0, 5),
-        clicksByDay: clicks.reduce((acc, click) => {
-          const day = click.timestamp.toISOString().split('T')[0];
-          acc[day] = (acc[day] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>),
+        dailyClicks: buildDailyClicks(clicks, days),
       };
 
       return NextResponse.json({ success: true, stats });
@@ -82,7 +100,7 @@ export async function GET(req: NextRequest) {
       averageClicks: userQRCodes.length > 0 ? allClicks.length / userQRCodes.length : 0,
       qrCodes: await Promise.all(
         userQRCodes.map(async (qr) => {
-          const trackingUrl = `${process.env.APP_URL}/api/qr/${qr.shortCode}`;
+          const trackingUrl = `${process.env.APP_URL}/${qr.shortCode}`;
           return {
             id: qr.id,
             title: qr.title,

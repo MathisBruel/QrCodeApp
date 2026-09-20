@@ -17,7 +17,8 @@ export const Navbar: React.FC<NavbarProps> = ({ user }) => {
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
-    router.push('/login');
+    localStorage.removeItem('auth_token');
+    router.push('/');
   };
 
   return (

@@ -57,7 +57,7 @@ export function generateWelcomeEmail(firstName: string, email: string, tempPassw
               Email: ${email}<br>
               Temporary Password: ${tempPassword}
             </div>
-            <p><a href="${process.env.APP_URL}/login" style="color: #000; text-decoration: underline;">Sign in now</a></p>
+            <p><a href="${process.env.APP_URL}" style="color: #000; text-decoration: underline;">Sign in now</a></p>
             <p style="font-size: 13px; color: #737373;">Change your password after first login.</p>
           </div>
           <div class="footer">

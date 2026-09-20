@@ -130,6 +130,38 @@ export default function AdminPage() {
     }
   };
 
+  const handleDeleteUser = async (userId: string, email: string) => {
+    const confirmed = window.confirm(
+      `Delete ${email}? This permanently removes their account, QR codes, and activity history. This cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    const token = localStorage.getItem('auth_token');
+    if (!token) return;
+
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ userId }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.error || 'Failed to delete user');
+        return;
+      }
+
+      fetchUsers(token);
+    } catch (error) {
+      alert('An error occurred');
+    }
+  };
+
   const handleToggleUser = async (userId: string, isActive: boolean) => {
     const token = localStorage.getItem('auth_token');
     if (!token) return;
@@ -265,13 +297,24 @@ export default function AdminPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleToggleUser(u.id, u.isActive)}
-                        >
-                          {u.isActive ? 'Deactivate' : 'Activate'}
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleToggleUser(u.id, u.isActive)}
+                          >
+                            {u.isActive ? 'Deactivate' : 'Activate'}
+                          </Button>
+                          {user.role === 'SUPER_ADMIN' && u.id !== user.userId && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteUser(u.id, u.email)}
+                            >
+                              Delete
+                            </Button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

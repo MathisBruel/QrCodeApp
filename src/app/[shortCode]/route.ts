@@ -107,7 +107,7 @@ export async function PATCH(
       },
     });
 
-    const trackingUrl = `${process.env.APP_URL}/api/qr/${updated.shortCode}`;
+    const trackingUrl = `${process.env.APP_URL}/${updated.shortCode}`;
     const qrDataURL = await generateQRCodeDataURL(trackingUrl);
 
     return NextResponse.json({

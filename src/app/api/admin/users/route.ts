@@ -67,30 +67,34 @@ export async function POST(req: NextRequest) {
     const tempPassword = nanoid(12);
     const passwordHash = await hashPassword(tempPassword);
 
-    const user = await prisma.user.create({
-      data: {
-        email,
-        firstName,
-        lastName,
-        role,
-        passwordHash,
-      },
+    const user = await prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data: {
+          email,
+          firstName,
+          lastName,
+          role,
+          passwordHash,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId: payload.userId,
+          action: 'CREATE_USER',
+          resourceType: 'USER',
+          resourceId: created.id,
+          ipAddress: getClientIP(req.headers),
+        },
+      });
+
+      return created;
     });
 
     await sendEmail({
       to: email,
       subject: 'Account Created',
       html: generateWelcomeEmail(firstName, email, tempPassword),
-    });
-
-    await prisma.auditLog.create({
-      data: {
-        userId: payload.userId,
-        action: 'CREATE_USER',
-        resourceType: 'USER',
-        resourceId: user.id,
-        ipAddress: getClientIP(req.headers),
-      },
     });
 
     return NextResponse.json({
@@ -147,6 +151,63 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ success: true, user });
   } catch (error) {
     console.error('Update user error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const authHeader = req.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const payload = verifyToken(token);
+    if (!payload || payload.role !== 'SUPER_ADMIN') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const { userId } = await req.json();
+
+    if (!userId) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    if (userId === payload.userId) {
+      return NextResponse.json({ error: 'Cannot delete your own account' }, { status: 400 });
+    }
+
+    const target = await prisma.user.findUnique({ where: { id: userId } });
+    if (!target) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    if (target.role === 'SUPER_ADMIN') {
+      const superAdminCount = await prisma.user.count({ where: { role: 'SUPER_ADMIN' } });
+      if (superAdminCount <= 1) {
+        return NextResponse.json({ error: 'Cannot delete the last Super Admin' }, { status: 400 });
+      }
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.user.delete({ where: { id: userId } });
+
+      await tx.auditLog.create({
+        data: {
+          userId: payload.userId,
+          action: 'DELETE_USER',
+          resourceType: 'USER',
+          resourceId: userId,
+          ipAddress: getClientIP(req.headers),
+        },
+      });
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Delete user error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

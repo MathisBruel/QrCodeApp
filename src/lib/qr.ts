@@ -16,7 +16,7 @@ export function generateShortCode(): string {
   return nanoid(8).toLowerCase();
 }
 
-const RESERVED_SLUGS = new Set(['generate', 'stats']);
+const RESERVED_SLUGS = new Set(['admin', 'api', 'dashboard', 'reset-password', 'favicon.ico']);
 const SLUG_PATTERN = /^[a-zA-Z0-9-_]{3,50}$/;
 
 export function validateSlug(slug: string): string | null {

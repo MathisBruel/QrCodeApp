@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
 
       shortCode = customSlug;
     }
-    const trackingUrl = `${process.env.APP_URL}/api/qr/${shortCode}`;
+    const trackingUrl = `${process.env.APP_URL}/${shortCode}`;
     const qrDataURL = await generateQRCodeDataURL(trackingUrl);
 
     const qrCode = await prisma.qRCode.create({

@@ -6,6 +6,7 @@ import { Navbar } from '@/components/Navbar';
 import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
 import { Card, CardContent, CardHeader } from '@/components/Card';
+import { ClicksChart } from '@/components/ClicksChart';
 
 interface QRCode {
   id: string;
@@ -49,6 +50,10 @@ export default function DashboardPage() {
   });
   const [editError, setEditError] = useState('');
   const [editLoading, setEditLoading] = useState(false);
+  const [statsQr, setStatsQr] = useState<QRCode | null>(null);
+  const [dailyClicks, setDailyClicks] = useState<{ date: string; count: number }[]>([]);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [statsDays, setStatsDays] = useState(30);
 
   useEffect(() => {
     const token = localStorage.getItem('auth_token');
@@ -167,7 +172,7 @@ export default function DashboardPage() {
         return;
       }
 
-      const res = await fetch(`/api/qr/${editingQr.shortCode}`, {
+      const res = await fetch(`/${editingQr.shortCode}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -193,6 +198,45 @@ export default function DashboardPage() {
     } finally {
       setEditLoading(false);
     }
+  };
+
+  const fetchStats = async (qrId: string, days: number) => {
+    setStatsLoading(true);
+
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        router.push('/');
+        return;
+      }
+
+      const res = await fetch(`/api/qr/stats?qrCodeId=${qrId}&days=${days}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setDailyClicks(data.stats.dailyClicks || []);
+      }
+    } catch (error) {
+      console.error('Fetch stats error:', error);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
+  const openStats = (qr: QRCode) => {
+    setShowForm(false);
+    setEditingQr(null);
+    setStatsQr(qr);
+    setStatsDays(30);
+    fetchStats(qr.id, 30);
+  };
+
+  const changeStatsRange = (days: number) => {
+    if (!statsQr) return;
+    setStatsDays(days);
+    fetchStats(statsQr.id, days);
   };
 
   const copyToClipboard = (text: string) => {
@@ -261,7 +305,7 @@ export default function DashboardPage() {
                     placeholder="my-campaign"
                   />
                   <p className="text-xs text-neutral-500 mt-1 truncate">
-                    {typeof window !== 'undefined' ? window.location.origin : ''}/api/qr/
+                    {typeof window !== 'undefined' ? window.location.origin : ''}/
                     {formData.customSlug || '(auto-generated)'}
                   </p>
                 </div>
@@ -312,7 +356,7 @@ export default function DashboardPage() {
                     placeholder="my-campaign"
                   />
                   <p className="text-xs text-neutral-500 mt-1 truncate">
-                    {typeof window !== 'undefined' ? window.location.origin : ''}/api/qr/
+                    {typeof window !== 'undefined' ? window.location.origin : ''}/
                     {editFormData.customSlug || '(auto-generated)'}
                   </p>
                   {editFormData.customSlug.trim() !== editingQr.shortCode && (
@@ -336,6 +380,41 @@ export default function DashboardPage() {
           </Card>
         )}
 
+        {statsQr && (
+          <Card className="mb-8">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold">Clicks — {statsQr.title}</h2>
+                <Button variant="ghost" size="sm" onClick={() => setStatsQr(null)}>
+                  Close
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex gap-1 mb-4">
+                {[7, 30, 90].map((days) => (
+                  <button
+                    key={days}
+                    onClick={() => changeStatsRange(days)}
+                    className={`px-3 py-1 text-sm rounded-sm transition-colors ${
+                      statsDays === days
+                        ? 'bg-neutral-900 text-white'
+                        : 'text-neutral-600 hover:bg-neutral-100'
+                    }`}
+                  >
+                    {days}d
+                  </button>
+                ))}
+              </div>
+              {statsLoading ? (
+                <p className="text-sm text-neutral-500">Loading...</p>
+              ) : (
+                <ClicksChart data={dailyClicks} />
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {qrCodes.map((qr) => (
             <Card key={qr.id} className="overflow-hidden">
@@ -353,6 +432,9 @@ export default function DashboardPage() {
                     <p className="text-xs text-neutral-500">Clicks</p>
                   </div>
                   <div className="flex gap-2">
+                    <Button variant="ghost" size="sm" onClick={() => openStats(qr)}>
+                      Stats
+                    </Button>
                     <Button variant="ghost" size="sm" onClick={() => openEdit(qr)}>
                       Edit
                     </Button>

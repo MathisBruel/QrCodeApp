@@ -3,6 +3,8 @@ import { prisma } from '@/lib/db';
 import { generateQRCodeDataURL, generateShortCode, validateSlug } from '@/lib/qr';
 import { verifyToken } from '@/lib/auth';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(req: NextRequest) {
   try {
     const authHeader = req.headers.get('authorization');

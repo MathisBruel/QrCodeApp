@@ -5,6 +5,8 @@ import { sendEmail, generateWelcomeEmail } from '@/lib/email';
 import { nanoid } from 'nanoid';
 import { getClientIP } from '@/lib/analytics';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest) {
   try {
     const authHeader = req.headers.get('authorization');
